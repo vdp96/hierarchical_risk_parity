@@ -4,10 +4,6 @@ import utils as hrp_utils
 import os
 from scipy.cluster.hierarchy import linkage, leaves_list
 
-# directory information
-PATH = os.path.dirname(os.getcwd())
-DATA_FOLDER = os.path.join(PATH, "data")
-
 
 def get_linkage(corr_matrix: np.array, linkage_type: str, distance_type: str) -> np.array:
     """
@@ -101,9 +97,14 @@ def get_cluster_variance(covariance_matrix: pd.DataFrame, cluster_idx: np.array)
 
 
 def do():
-    ticker_name_map = hrp_utils.get_snp_constituents_for_date(date="2020-12-31", wrds_id="vpunjala1996")
-    snp_tickers = list(ticker_name_map.keys())
-    data = hrp_utils.get_data_for_date_range(snp_tickers, start_date="2021-01-01", end_date="2022-01-01")
+    # directory information
+    CUR_DIR = os.path.dirname(os.getcwd())
+    DATA_FOLDER = os.path.join(CUR_DIR, "data")
+    ALL_DATA = os.path.join(DATA_FOLDER, "all_data.pkl")
+    data = pd.read_pickle(ALL_DATA)
+
+    data = hrp_utils.filter_data_for_date_range(df=data, start_date="2021-01-01", end_date="2022-01-01",
+                                                id_col="permno")
     data = data[["date", "ticker", "ret"]]
 
     data = hrp_utils.clean_dataset(df=data, fillna=True)

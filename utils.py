@@ -1,67 +1,78 @@
 import pandas as pd
-import numpy as np
-import wrds_loader
-import os
 import copy
-import json
-from sklearn.cluster import AgglomerativeClustering
-
-# directory information
-PATH = os.path.dirname(os.getcwd())
-DATA_FOLDER = os.path.join(PATH, "data")
-RETURNS_FOLDER = os.path.join(DATA_FOLDER, "returns")
-ALL_DATA = "/Users/vdp/mfe/quarters/quarter_4_fall_2023/AFP/data/processed_data/all_data.pkl"
 
 
-def check_na_count(df, column, row_threshold=0.8):
+def __check_na_count(df: pd.DataFrame, column: str, row_threshold: float, id_col: str) -> pd.DataFrame:
+    """
+    Helper function that enforces check on number of rows for each ticker based on input threshold level.
+    If count of rows is less than threshold level, omits the ticker from the dataset
+
+    :param df: input dataframe with [date, ticker, value] cols
+    :param column: column on which threshold is to be implemented
+    :param row_threshold: threshold criteria
+    :param id_col: column that identifies the stock [ticker or permno]
+    :return:
+    """
     # getting ratio of nulls for each ticker in df
-    na_count = df.groupby("ticker")[column].apply(lambda x: x.isna().mean())
+    na_count = df.groupby(id_col)[column].apply(lambda x: x.isna().mean())
 
-    ban_tickers = na_count[na_count <= row_threshold]
-    df = df[~df.ticker.isin(ban_tickers)]
+    # get stocks that need to be omitted
+    ban_stocks = na_count[na_count <= row_threshold]
+
+    # final output
+    df = df[~df[id_col].isin(ban_stocks)]
     return df
 
 
-def clean_dataset(df, fillna=True, row_threshold=0.8):
+def clean_dataset(df: pd.DataFrame, fillna: bool = True, row_threshold: float = 0.8,
+                  id_col: str = "permno") -> pd.DataFrame:
     """
-    Function check for:
+    Utility function that cleans the datasets by checking for:
         1. Nan Values -
             - fill with 0
             - remove those tickers
-            - fill with average or some ffill
+            - fill with sector mean (TODO)
 
         2. Duplicates on ticker column
             - drop duplicated tickers
-    :param df:
-    :return:
-    """
-    df = check_na_count(df, column="ret", row_threshold=row_threshold)
 
-    # Take care of nan values
+    :param df: input dataframe that needs to be clearned
+    :param fillna: Whether to fill NaN values with 0 or drop them
+    :param row_threshold: threshold criteria to check if each stock has enough data
+    :param id_col: column that identifies the stock [ticker or permno]
+    :return: cleaned dataset
+    """
+
+    # filtering stocks based on NaN values. At least threshold % should not be NaN's
+    df = __check_na_count(df, column="ret", row_threshold=row_threshold, id_col=id_col)
+
+    # taking care of nan values
     if fillna:
         df = df.fillna(0)
-        # check na count
     else:
-        missing_tickers = df[df.isna().any(axis=1)]["ticker"].unique()
-        df = df[~df["ticker"].isin(missing_tickers)]
+        missing_stocks = df[df.isna().any(axis=1)][id_col].unique()
+        df = df[~df[id_col].isin(missing_stocks)]
 
-    # Take care of duplicate tickers
-    df = df.drop_duplicates(subset=["date", "ticker"], keep="first")
+    # taking care of duplicate tickers
+    df = df.drop_duplicates(subset=["date", id_col], keep="last")
 
-    count_df = df.value_counts("ticker").reset_index()
+    # filtering stocks based on number of data points available. At least threshold % of the max data points per stock
+    # should be available
+    count_df = df.value_counts(id_col).reset_index()
     max_rows = count_df[0].max()
-    tickers = count_df[count_df[0] > row_threshold * max_rows]["ticker"].to_list()
-    df = df[df["ticker"].isin(tickers)]
+    req_stocks = count_df[count_df[0] > row_threshold * max_rows][id_col].to_list()
+    df = df[df[id_col].isin(req_stocks)]
     return df
 
 
-def create_correlation_matrix(df, corr_type="spearman", covariance=False):
+def create_correlation_matrix(df: pd.DataFrame, corr_type: str = "spearman", id_col: str = "permno",
+                              value_col: str = "ret", covariance: bool = False) -> pd.DataFrame:
     """
     Assuming input df will have the following structure:
     columns:
         1. date
         2. ticker
-        3. return
+        3. value
 
     date        | ticker |  returns
     20220101    AAPL    0.001
@@ -69,12 +80,14 @@ def create_correlation_matrix(df, corr_type="spearman", covariance=False):
     20220101    MSFT    0.14
     20220102    MSFT    -1
 
-    :param df:
-    :param corr_type:
-    :param covariance:
+    :param df: input returns dataframe
+    :param corr_type: type of correlations ["pearson", "spearman"]
+    :param id_col: id column in dataframe ["ticker", "permno"]
+    :param value_col: column based on which correlations are to be calculates
+    :param covariance: whether to calc corr or cov
     :return: correlation df
     """
-    df = df.pivot(index="date", columns="ticker", values="ret")
+    df = df.pivot(index="date", columns=id_col, values=value_col)
 
     if covariance:
         out = df.cov()
@@ -83,7 +96,7 @@ def create_correlation_matrix(df, corr_type="spearman", covariance=False):
     return out
 
 
-def create_return_matrix(df):
+def create_return_matrix(df: pd.DataFrame) -> pd.DataFrame:
     """
     Assuming input df will have the following structure:
     columns:
@@ -98,7 +111,7 @@ def create_return_matrix(df):
     20220102    MSFT    -1
 
     :param df:
-    :return:
+    :return: pivoted dataframe with dates as columns
     ticker        |  20220101 |  20220102
     AAPL            0.001       0.002
     MSFT            0.14        -0.01
@@ -107,162 +120,64 @@ def create_return_matrix(df):
     return df
 
 
-def get_snp_constituents_for_date(date, wrds_id):
-    snp_data = wrds_loader.download_snp_constituents(wrds_id=wrds_id)
-    snp_for_date = snp_data[snp_data["date"] == date]
+def filter_data_for_date_range(df: pd.DataFrame, start_date, end_date, stocks: list = None,
+                               id_col: str = "permno") -> pd.DataFrame:
+    """
+    Helper function to filter dataframe based on input dates, stocks
 
-    # tickers = snp_for_date["ticker"].tolist()
-    ticker_name_map = snp_for_date.set_index("ticker")["comnam"].to_dict()
-    return ticker_name_map
+    :param df: input dataframe
+    :param start_date: start date
+    :param end_date: end date
+    :param stocks: stocks to be filter for if/any
+    :param id_col: id column
+    :return: filtered dataframe
+    """
+    if stocks:
+        df = df[df[id_col].isin(stocks)]
 
-
-def __dump_snp_constituents_all_years():
-    snp_df = wrds_loader.download_snp_constituents(wrds_id="vpunjala1996")
-    snp_df["date"] = pd.to_datetime(snp_df.date)
-    max_dates = snp_df.groupby(pd.Grouper(key="date", freq="1Y"))["date"].max().to_list()
-
-    snp_constituents = dict()
-
-    for dt in max_dates:
-        tickers = snp_df[snp_df["date"] == dt].ticker.to_list()
-        snp_constituents[str(dt.year + 1)] = tickers
-
-    snp_file = os.path.join(DATA_FOLDER, "snp_constituents.json")
-    with open(snp_file, "w") as fp:
-        json.dump(snp_constituents, fp)
-    return
-
-
-def __dump_data_to_feather_file():
-    returns_files = os.listdir(RETURNS_FOLDER)
-
-    # Read ticker data
-    df_list = list()
-    for file in returns_files:
-        file_path = os.path.join(RETURNS_FOLDER, file)
-        fdf = pd.read_feather(file_path)
-        df_list.append(fdf)
-
-    df = pd.concat(df_list, axis=0, ignore_index=True)
-    file_name = "all_file.feather"
-    file_path = os.path.join(RETURNS_FOLDER, file_name)
-    df.to_feather(file_path)
-    return
-
-
-def get_data_for_date_range(tickers, start_date, end_date):
-    # all_file_path = os.path.join(DATA_FOLDER, "all_data.pkl")
-    df = pd.read_pickle(ALL_DATA)
-
-    df = df[df["ticker"].isin(tickers)]
     df = df[(df["date"] >= start_date) & (df["date"] <= end_date)].reset_index(drop=True)
     print(f"df.shape: {df.shape}")
     return df
 
 
-def get_gics_data(date: str = None):
-    gics_file = os.path.join(DATA_FOLDER, "GICS.csv")
-    df = pd.read_csv(gics_file)
-    req_cols = ["datadate", "tic", "Sector", "IndustryGroup", "Industry", "SubIndustry"]
+def convert_to_higher_timeframe(daily_df: pd.DataFrame, timeframe: str, date_col: str = "date", id_col: str = "permno",
+                                ret_col: str = "ret") -> pd.DataFrame:
+    """
+    Function to convert daily timeseries returns data to higher aggregated timeseries
+    
+    :param daily_df: dataframe with daily data
+    :param timeframe: weekly, monthly, yearly
+    :param date_col: date column
+    :param id_col: id column in df
+    :param ret_col: returns column
+    :return: higher timeseries dataframe
+    """
+    higher_df = copy.deepcopy(daily_df)
+    higher_df[date_col] = pd.to_datetime(higher_df[date_col])
 
-    df = df[req_cols]
-    df.columns = ["date", "ticker", "sector", "industry_group", "industry", "sub_industry"]
+    # set date as index
+    higher_df = higher_df.set_index(date_col)
 
-    if date:
-        df = df[df["date"] == date].reset_index(drop=True)
-    print(f"df.shape: {df.shape}")
-    return df
-
-
-def create_linkage_matrix(clustering):
-    # create the counts of samples under each node
-    counts = np.zeros(clustering.children_.shape[0])
-    n_samples = len(clustering.labels_)
-
-    for i, merge in enumerate(clustering.children_):
-        current_count = 0
-
-        for child_idx in merge:
-            if child_idx < n_samples:
-                current_count += 1  # leaf node
-            else:
-                current_count += counts[child_idx - n_samples]
-        counts[i] = current_count
-
-    linkage_matrix = np.column_stack([clustering.children_, clustering.distances_, counts]).astype(float)
-
-    return linkage_matrix
+    # getting aggregated returns
+    higher_df = higher_df.groupby([id_col, pd.Grouper(freq=timeframe)]).apply(lambda x: (x[ret_col] + 1).prod() - 1)
+    higher_df = higher_df.reset_index().rename(columns={0: ret_col})
+    return higher_df
 
 
-def get_distance_matrix(corr_matrix):
-    return np.sqrt((1 - corr_matrix) / 2)
+def compute_weighted_returns(returns_df: pd.DataFrame, weight_col: str, ret_col: str = "ret") -> pd.DataFrame:
+    """
+    Calculates weighted returns for input dataframe
 
+    :param returns_df: input returns df
+    :param weight_col: weight column
+    :param ret_col: returns column
+    :return:
+    """
+    returns_df = copy.deepcopy(returns_df)
 
-def perform_clustering(df, cluster_list):
-    corr_df = create_correlation_matrix(df, "spearman")
-    dist_df = get_distance_matrix(corr_df)
+    # weighted return column
+    weight_ret_col = weight_col + "_" + ret_col
 
-    for n in cluster_list:
-        clusters = AgglomerativeClustering(n_clusters=n, linkage="ward").fit_predict(dist_df)
-        cluster_map = dict(zip(dist_df.columns, clusters))
-        df[f"cluster_{n}"] = df["ticker"].map(cluster_map)
-    return df
-
-
-def get_correlation_summary(cl_df):
-    cl_df = create_correlation_matrix(cl_df)
-    cl_df = cl_df.stack()
-    cl_df.index.names = ["ticker1", "ticker2"]
-    cl_df = cl_df.reset_index()
-    cl_df = cl_df[cl_df["ticker1"] != cl_df["ticker2"]]
-
-    mean_corr = cl_df[0].mean()
-    return mean_corr
-
-
-def get_cluster_correlation_summary(cluster_df, cluster_columns):
-    cluster_wise_corr_dict = dict()
-    year_wise_corr_dict = dict()
-
-    for cluster_col in cluster_columns:
-        corr_df = cluster_df.groupby(["year", cluster_col]).apply(
-            lambda x: get_correlation_summary(x)).reset_index().rename(columns={0: "correlation"})
-        cluster_wise_corr_dict[cluster_col] = corr_df[["year", cluster_col, "correlation"]]
-        year_wise_corr_dict[cluster_col] = corr_df.reset_index().groupby("year")[
-            "correlation"].mean().reset_index().rename(columns={0: "correlation"})
-
-    return cluster_wise_corr_dict, year_wise_corr_dict
-
-
-def get_monthly_returns(daily_df):
-    monthly_df = copy.deepcopy(daily_df)
-    monthly_df["date"] = pd.to_datetime(monthly_df["date"])
-
-    # Set date as index
-    monthly_df = monthly_df.set_index("date")
-
-    # Getting Monthly Returns
-    monthly_df = monthly_df.groupby(["ticker", pd.Grouper(freq="M")]).apply(lambda x: (x["ret"] + 1).prod() - 1)
-    monthly_df = monthly_df.reset_index().rename(columns={0: "ret"})
-    return monthly_df
-
-
-def get_yearly_returns(monthly_df, weight_col=None):
-    monthly_df = copy.deepcopy(monthly_df)
-
-    if weight_col:
-        weight_ret_col = weight_col + "_ret"
-        monthly_df[weight_ret_col] = monthly_df["ret"] * monthly_df[weight_col]
-    else:
-        weight_ret_col = "ret"
-
-    monthly_df["date"] = pd.to_datetime(monthly_df["date"])
-
-    # Set date as index
-    monthly_df = monthly_df.set_index("date")
-
-    # Getting Monthly Returns
-    monthly_df = monthly_df.groupby(["ticker", pd.Grouper(freq="Y")]).apply(
-        lambda x: (x[weight_ret_col] + 1).prod() - 1)
-    monthly_df = monthly_df.reset_index().rename(columns={0: weight_ret_col})
-    return monthly_df
+    # adding weighted ret col to df
+    returns_df[weight_ret_col] = returns_df["ret"] * returns_df[weight_col]
+    return returns_df

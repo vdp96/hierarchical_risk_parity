@@ -4,7 +4,7 @@ import hrp
 import utils as hrp_utils
 
 
-def get_hrp_weights(df: pd.DataFrame, linkage_type: str = "single", distance_type: str = "euclidean") -> pd.Series:
+def compute_hrp_weights(df: pd.DataFrame, linkage_type: str = "single", distance_type: str = "euclidean") -> pd.Series:
     """
     Computes HRP allocation for a portfolio according to initial paper. Has additional linkage types to explore
 
@@ -33,7 +33,7 @@ def get_hrp_weights(df: pd.DataFrame, linkage_type: str = "single", distance_typ
     return pd.Series(weights, index=tickers, name="HRP")
 
 
-def get_mv_weights(df: pd.DataFrame) -> pd.Series:
+def compute_mv_weights(df: pd.DataFrame) -> pd.Series:
     """
     Computes weights based on minimum variance allocation
     :param df: dataframe with assets, returns and date
@@ -52,7 +52,7 @@ def get_mv_weights(df: pd.DataFrame) -> pd.Series:
     return pd.Series(weights, index=tickers, name="MV")
 
 
-def get_rp_weights(df: pd.DataFrame) -> pd.Series:
+def compute_rp_weights(df: pd.DataFrame) -> pd.Series:
     """
     Computes Risk parity allocation
 
@@ -69,7 +69,7 @@ def get_rp_weights(df: pd.DataFrame) -> pd.Series:
     return pd.Series(weights, index=tickers, name="RP")
 
 
-def get_unif_weights(df: pd.DataFrame) -> pd.Series:
+def compute_unif_weights(df: pd.DataFrame) -> pd.Series:
     """
     Computes equal weighted returns
 
@@ -82,8 +82,3 @@ def get_unif_weights(df: pd.DataFrame) -> pd.Series:
     # weights
     weights = [1 / len(tickers)] * len(tickers)
     return pd.Series(weights, index=tickers, name="unif")
-
-
-def compute_ER(returns, weights):
-    mean = returns.mean(0)
-    return weights.values * mean
