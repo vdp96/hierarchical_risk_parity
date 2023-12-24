@@ -1,7 +1,8 @@
+import os
 import pandas as pd
 import numpy as np
 import utils as hrp_utils
-import os
+
 from scipy.cluster.hierarchy import linkage, leaves_list
 
 
@@ -98,16 +99,16 @@ def get_cluster_variance(covariance_matrix: pd.DataFrame, cluster_idx: np.array)
 
 def do():
     # directory information
-    CUR_DIR = os.path.dirname(os.getcwd())
+    CUR_DIR = os.getcwd()
     DATA_FOLDER = os.path.join(CUR_DIR, "data")
-    ALL_DATA = os.path.join(DATA_FOLDER, "all_data.pkl")
-    data = pd.read_pickle(ALL_DATA)
+    ALL_DATA = os.path.join(DATA_FOLDER, "all_data.feather")
+    data = pd.read_feather(ALL_DATA)
 
-    data = hrp_utils.filter_data_for_date_range(df=data, start_date="2021-01-01", end_date="2022-01-01",
+    data = hrp_utils.filter_data_for_date_range(df=data, start_date="2021-01-01", end_date="2021-12-31",
                                                 id_col="permno")
-    data = data[["date", "ticker", "ret"]]
+    data = data[["date", "permno", "ret"]]
 
-    data = hrp_utils.clean_dataset(df=data, fillna=True)
+    data = hrp_utils.clean_dataset(df=data, fillna=False)
     corr = hrp_utils.create_correlation_matrix(df=data)
     link = get_linkage(corr_matrix=corr, linkage_type="ward", distance_type="euclidean")
     x = perform_quasi_diagonalization(link)
