@@ -72,7 +72,7 @@ def perform_recursive_bipartition(covariance_matrix: pd.DataFrame, quasi_diag_id
             cluster_var1 = get_cluster_variance(covariance_matrix, cluster1)
             cluster_var2 = get_cluster_variance(covariance_matrix, cluster2)
 
-            # HRP allocation alpha (equivalent to inverse vol)
+            # HRP allocation or split factor
             alpha = 1 - cluster_var1 / (cluster_var1 + cluster_var2)
             weights[cluster1] *= alpha
             weights[cluster2] *= 1 - alpha
@@ -87,14 +87,19 @@ def get_cluster_variance(covariance_matrix: pd.DataFrame, cluster_idx: np.array)
     :param cluster_idx: indexes of stocks within cluster
     :return: cluster variance
     """
-    cov = covariance_matrix.iloc[cluster_idx, cluster_idx]  # matrix slice
+    # get cluster stocks only
+    cov = covariance_matrix.iloc[cluster_idx, cluster_idx]
 
-    # calculate the inverse-variance portfolio
-    inv_var = 1. / np.diag(cov)
+    # calculate the inverse cluster variance
+    inv_var = 1 / np.diag(cov)
     inv_var /= inv_var.sum()
+
+    # inverse vol weight
     w = inv_var.reshape(-1, 1)
-    cluster_var = np.dot(np.dot(w.T, cov), w)[0, 0]
-    return cluster_var
+
+    # produces 1X1 matrix
+    cluster_variance = np.dot(np.dot(w.T, cov), w)[0, 0]
+    return cluster_variance
 
 
 def do():

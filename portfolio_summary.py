@@ -113,6 +113,6 @@ def compute_portfolio_summary(ret_df: pd.DataFrame, return_columns: list = None)
     sharpe = ___compute_sharpe_ratio(ret_df=ret_df)
     tstat = __compute_t_stat(ret_df=ret_df)
 
-    summary_df = pd.concat([cum_ret, cagr, mar, ann_vol, sharpe, tstat, maxdd], axis=1).round(4)
+    summary_df = (pd.concat([cum_ret, cagr, mar, ann_vol, sharpe, tstat, maxdd], axis=1)).round(2)
 
     return summary_df

@@ -38,6 +38,7 @@ def compute_hrp_weights(df: pd.DataFrame, linkage_type: str = "single", distance
 def compute_mv_weights(df: pd.DataFrame) -> pd.Series:
     """
     Computes weights based on minimum variance allocation
+
     :param df: dataframe with assets, returns and date
     :return: Series with tickers and weights
     """
@@ -51,7 +52,7 @@ def compute_mv_weights(df: pd.DataFrame) -> pd.Series:
     # calculating min var allocation
     u = np.ones(len(covariance_matrix))
     weights = np.dot(inv_covar, u) / np.dot(u, np.dot(inv_covar, u))
-    return pd.Series(weights, index=stocks, name="MV")
+    return pd.Series(weights, index=stocks, name="MV_wgt")
 
 
 def compute_rp_weights(df: pd.DataFrame) -> pd.Series:
@@ -66,9 +67,9 @@ def compute_rp_weights(df: pd.DataFrame) -> pd.Series:
     stocks = covariance_matrix.columns
 
     # risk parity allocation
-    weights = (1 / np.diag(covariance_matrix))
+    weights = np.sqrt((1 / np.diag(covariance_matrix)))
     weights /= sum(weights)
-    return pd.Series(weights, index=stocks, name="RP")
+    return pd.Series(weights, index=stocks, name="RP_wgt")
 
 
 def compute_unif_weights(df: pd.DataFrame, id_col: str = "permno") -> pd.Series:
