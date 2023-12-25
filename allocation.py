@@ -79,7 +79,7 @@ def compute_unif_weights(df: pd.DataFrame, id_col: str = "permno") -> pd.Series:
     :param id_col: identifier column
     :return: Series with tickers and weights
     """
-
+    # equal weight to all stocks
     df["EQ"] = 1 / len(df)
     df = df.set_index(id_col)
     weights = df["EQ"].squeeze()
@@ -96,7 +96,7 @@ def compute_mkt_weights(df: pd.DataFrame, mkt_col: str = "lag_mkt_cap", id_col: 
     :param id_col: identifier column
     :return: Series with tickers and weights
     """
-
+    # market weight
     df["MKT"] = df[mkt_col] / df[mkt_col].sum()
     df = df.set_index(id_col)
     weights = df["MKT"].squeeze()
