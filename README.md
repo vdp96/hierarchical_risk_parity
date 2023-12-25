@@ -34,5 +34,4 @@ All the data used within this project has been acquired from WRDS Database. Sinc
 2. HRP portfolios had lower annual volatility compared to base cases
 3. HRP portfolios had lower max drawdown compared to base cases
 4. HRP portfolios outperformed the base cases of Market, Equal and Risk Parity Weighting in terms of sharpe ratio (return over risk)
-5. Overall, it looks like HRP is indeed a superior portfolio construction technique for investors looking to attain higher risk over return
-![img.png](img.png)
+5. Overall, it looks like HRP is indeed a superior portfolio construction technique that one should have in their toolkit
