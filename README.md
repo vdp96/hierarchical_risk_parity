@@ -8,7 +8,7 @@ In this project, I explored 4 different linkages (single, complete, ward, averag
 **Link to project:** https://github.com/vdp96/hierarchical_risk_parity/blob/main/performance_study.ipynb
 
 
-## How It's Made:
+## Work Flow and Description:
 
 **Tech Used:** Python, Jupyter Notebook
 
@@ -28,7 +28,7 @@ All the data used within this project has been acquired from WRDS Database. Sinc
 - Similarly, for market weighting, last available market cap of each stock in previous year (lagged market cap) is used
 - Similarly, for risk parity weighting, previous year stock volatilities are used
 
-## Lessons Learned:
+## Conclusion:
 
 1. Changing linkage types in HRP portfolios did not produce significant difference in portfolio allocation and performance
 2. HRP portfolios had lower annual volatility compared to base cases
